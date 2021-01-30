@@ -34,11 +34,14 @@ static const int both           = 0x05;
 static const int middleAndRight = 0x06;
 
 rfb::BoolParameter emulateMiddleButton("dummy_name", "dummy_desc", true);
+rfb::BoolParameter emulateMiddleButtonMod("dummy_name", "dummy_desc", false);
 
 class TestClass : public EmulateMB
 {
 public:
+  TestClass() : EmulateMB(0) {}
   virtual void sendPointerEvent(const rfb::Point& pos, int buttonMask);
+  void writeKeyEvent(rdr::U32 keySym, rdr::U32 keyCode, bool down) {}
 
   struct PointerEventParams {rfb::Point pos; int mask; };
 

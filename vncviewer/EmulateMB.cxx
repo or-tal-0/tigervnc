@@ -194,9 +194,44 @@ static const signed char stateTab[11][5][3] = {
   },
 };
 
-EmulateMB::EmulateMB()
-  : state(0), emulatedButtonMask(0), timer(this)
+EmulateMB::EmulateMB(rdr::U32 emulateMBModKey)
+  : state(0), emulatedButtonMask(0), timer(this), emulateMiddleButtonModifierKey(emulateMBModKey),
+    isEmulateMBMKDown(false), isKeyPressWhileDown(false)
 {
+}
+
+bool EmulateMB::filterKeyPress(int keyCode, rdr::U32 keySym)
+{
+  if (emulateMiddleButtonMod && keySym == emulateMiddleButtonModifierKey) {
+    isEmulateMBMKDown = true;
+    modKeyCode = keyCode;
+    return true;
+  }
+  else if (isEmulateMBMKDown) {
+    // Send the original modifier event
+    writeKeyEvent(emulateMiddleButtonModifierKey, modKeyCode, true);
+    isKeyPressWhileDown = true;
+  }
+
+  return false;
+}
+
+bool EmulateMB::filterKeyReleaseTop(int keyCode)
+{
+  if (isEmulateMBMKDown && keyCode == modKeyCode) {
+    // The modifier key for the mod-click was released.
+    isEmulateMBMKDown = false;
+    return true;
+  }
+  return false;
+}
+
+void EmulateMB::filterKeyReleaseBottom(int keyCode)
+{
+  if (isKeyPressWhileDown) {
+    writeKeyEvent(emulateMiddleButtonModifierKey, modKeyCode, false);
+    isKeyPressWhileDown = false;
+  }
 }
 
 void EmulateMB::filterPointerEvent(const rfb::Point& pos, int buttonMask)
@@ -204,6 +239,13 @@ void EmulateMB::filterPointerEvent(const rfb::Point& pos, int buttonMask)
   int btstate;
   int action1, action2;
   int lastState;
+
+  if (emulateMiddleButtonMod) {
+      if (isEmulateMBMKDown && buttonMask & 0x1) {
+	  sendPointerEvent(pos, 0x2); // If ctrl_l + left click where pressed then send middle click instead.
+	  return;
+      }
+  }
 
   // Just pass through events if the emulate setting is disabled
   if (!emulateMiddleButton) {
