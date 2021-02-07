@@ -280,7 +280,7 @@ void EmulateMB::filterPointerEvent(const rfb::Point& pos, int buttonMask)
   if (emulateMiddleButtonMod && modifierPressed) {
     if (buttonMask & 0x1) {
       // If mod-button1 was pressed then translate it to button2. There may be other buttons pressed simultaneously.
-      sendPointerEvent(pos, buttonMask & ~0x1 | 0x2);
+      sendPointerEvent(pos, (buttonMask & ~0x1) | 0x2);
       sentMiddleClick = true;
       return;
     }
