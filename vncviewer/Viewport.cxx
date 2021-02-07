@@ -827,6 +827,25 @@ void Viewport::handlePointerTimeout(void *data)
 
 void Viewport::writeKeyEvent(rdr::U32 keySym, rdr::U32 keyCode, bool down)
 {
+  if (down) {
+    // Because of the way keyboards work, we cannot expect to have the same
+    // symbol on release as when pressed. This breaks the VNC protocol however,
+    // so we need to keep track of what keysym a key _code_ generated on press
+    // and send the same on release.
+    downKeySym[keyCode] = keySym;
+  }
+  else {
+    DownMap::iterator iter = downKeySym.find(keyCode);
+    if (iter == downKeySym.end()) {
+      // These occur somewhat frequently so let's not spam them unless
+      // logging is turned up.
+      vlog.debug("Unexpected release of key code %d", keyCode);
+      return;
+    }
+    keySym = iter->second;
+    downKeySym.erase(iter);
+  }
+
 #if defined(WIN32) || defined(__APPLE__)
   vlog.debug("Key %s: 0x%04x => 0x%04x", down ? "pressed" : "released", keyCode, keySym);
 #else
@@ -892,39 +911,21 @@ void Viewport::handleKeyPress(int keyCode, rdr::U32 keySym)
 #endif
 
   if (filterKeyPress(keyCode, keySym))
-      return;
-
-  // Because of the way keyboards work, we cannot expect to have the same
-  // symbol on release as when pressed. This breaks the VNC protocol however,
-  // so we need to keep track of what keysym a key _code_ generated on press
-  // and send the same on release.
-  downKeySym[keyCode] = keySym;
+    return;
 
   writeKeyEvent(keySym, keyCode, true);
 }
 
 void Viewport::handleKeyRelease(int keyCode)
 {
-  DownMap::iterator iter;
 
   if (viewOnly)
     return;
 
-  if (filterKeyReleaseTop(keyCode))
-      return;
-
-  iter = downKeySym.find(keyCode);
-  if (iter == downKeySym.end()) {
-    // These occur somewhat frequently so let's not spam them unless
-    // logging is turned up.
-    vlog.debug("Unexpected release of key code %d", keyCode);
+  if (filterKeyRelease(keyCode))
     return;
-  }
 
-  writeKeyEvent(iter->second, keyCode, false);
-
-  downKeySym.erase(iter);
-  filterKeyReleaseBottom(keyCode);
+  writeKeyEvent(0, keyCode, false); // keySym will be populated by writeKeyEvent based on the keyCode.
 }
 
 
